@@ -116,7 +116,7 @@
       } else {
         
         stackedTag = stack.last().toLowerCase();
-        reStackedTag = reCache[stackedTag] || (reCache[stackedTag] = new RegExp("([\\s\\S]*?)<\/" + stackedTag + "[^>]*>", "i"));
+        var reStackedTag = reCache[stackedTag] || (reCache[stackedTag] = new RegExp("([\\s\\S]*?)<\/" + stackedTag + "[^>]*>", "i"));
         
         html = html.replace(reStackedTag, function(all, text) {
           if (stackedTag !== 'script' && stackedTag !== 'style') {
