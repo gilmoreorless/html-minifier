@@ -30,7 +30,7 @@
   }
   
   function collapseWhitespace(str) {
-    return str.replace(/\s+/g, ' ');
+    return str.replace(/^\s+$/, '').replace(/\s+/g, ' ');
   }
   
   function isConditionalComment(text) {
@@ -254,10 +254,20 @@
         buffer = [ ],
         currentChars = '',
         currentTag = '',
+        lastTokens = [],
+        tokenLimit = 2,
         stackNoTrimWhitespace = [],
         stackNoCollapseWhitespace = [],
         lint = options.lint,
         t = new Date()
+
+    lastTokens.push = function () {
+      var args = arguments;
+      if (this.length + args.length > tokenLimit) {
+        this.splice(0, this.length - tokenLimit + 1);
+      }
+      return Array.prototype.push.apply(this, args);
+    };
     
     HTMLParser(value, {
       start: function( tag, attrs, unary ) {
@@ -285,16 +295,26 @@
         }
         
         buffer.push('>');
+        lastTokens.push('start');
       },
       end: function( tag ) {
-        // check if current tag is in a whitespace stack
         if (options.collapseWhitespace) {
+          // trim previous chars under certain circumstances
+          if (
+            !stackNoTrimWhitespace.length &&
+            lastTokens.length == tokenLimit &&
+            lastTokens[tokenLimit - 2] == 'start' &&
+            lastTokens[tokenLimit - 1] == 'chars'
+          ) {
+            buffer[buffer.length - 1] = trimWhitespace(buffer[buffer.length - 1]);
+          }
+          // check if current tag is in a whitespace stack
           if (stackNoTrimWhitespace.length &&
-            tag == stackNoTrimWhitespace[stackNoTrimWhitespace.length - 1]) {
+           tag == stackNoTrimWhitespace[stackNoTrimWhitespace.length - 1]) {
             stackNoTrimWhitespace.pop();
           }
           if (stackNoCollapseWhitespace.length &&
-            tag == stackNoCollapseWhitespace[stackNoCollapseWhitespace.length - 1]) {
+           tag == stackNoCollapseWhitespace[stackNoCollapseWhitespace.length - 1]) {
             stackNoCollapseWhitespace.pop();
           }
         }
@@ -317,6 +337,7 @@
         // flush buffer
         buffer.length = 0;
         currentChars = '';
+        lastTokens.push('end');
       },
       chars: function( text ) {
         if (currentTag === 'script' || currentTag === 'style') {
@@ -338,6 +359,7 @@
         currentChars = text;
         lint && lint.testChars(text);
         buffer.push(text);
+        lastTokens.push('chars');
       },
       comment: function( text ) {
         if (options.removeComments) {
@@ -352,9 +374,11 @@
           text = '<!--' + text + '-->';
         }
         buffer.push(text);
+        lastTokens.push('comment');
       },
       doctype: function(doctype) {
         buffer.push(options.useShortDoctype ? '<!DOCTYPE html>' : collapseWhitespace(doctype));
+        lastTokens.push('doctype');
       }
     });  
     
