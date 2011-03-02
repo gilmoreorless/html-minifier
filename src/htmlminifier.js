@@ -20,13 +20,13 @@
     log = function(){ };
   }
   
-  function trimWhitespace(str) {
-    return str.replace(/^\s+/, '').replace(/\s+$/, '');
-  }
-  if (String.prototype.trim) {
-    trimWhitespace = function(str) {
+  function trimWhitespace(str, skipStart, skipEnd) {
+    if (!skipStart && !skipEnd && String.prototype.trim) {
       return str.trim();
-    };
+    }
+    skipStart || (str = str.replace(/^\s+/, ''));
+    skipEnd || (str = str.replace(/\s+$/, ''));
+    return str;
   }
   
   function collapseWhitespace(str) {
@@ -275,8 +275,17 @@
         currentTag = tag;
         currentChars = '';
         
-        // set whitespace flags for nested tags (eg. <code> within a <pre>)
         if (options.collapseWhitespace) {
+          // trim previous chars under certain circumstances
+          if (
+            !stackNoTrimWhitespace.length &&
+            lastTokens.length == tokenLimit &&
+            lastTokens[tokenLimit - 1] == 'chars'
+          ) {
+            var skipStart = (lastTokens[tokenLimit - 2] != 'start');
+            buffer[buffer.length - 1] = trimWhitespace(buffer[buffer.length - 1], skipStart, true);
+          }
+          // set whitespace flags for nested tags (eg. <code> within a <pre>)
           if (!canTrimWhitespace(tag)) {
             stackNoTrimWhitespace.push(tag);
           }
@@ -295,18 +304,19 @@
         }
         
         buffer.push('>');
-        lastTokens.push('start');
+        lastTokens.push(unary ? 'end' : 'start');
       },
       end: function( tag ) {
         if (options.collapseWhitespace) {
           // trim previous chars under certain circumstances
           if (
+            currentChars &&
             !stackNoTrimWhitespace.length &&
             lastTokens.length == tokenLimit &&
-            lastTokens[tokenLimit - 2] == 'start' &&
             lastTokens[tokenLimit - 1] == 'chars'
           ) {
-            buffer[buffer.length - 1] = trimWhitespace(buffer[buffer.length - 1]);
+            var skipStart = (lastTokens[tokenLimit - 2] != 'start');
+            buffer[buffer.length - 1] = trimWhitespace(currentChars, skipStart);
           }
           // check if current tag is in a whitespace stack
           if (stackNoTrimWhitespace.length &&
